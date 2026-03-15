@@ -23,6 +23,7 @@ This folder provisions a complete Amazon EKS environment in your AWS account usi
 - [start-cluster.ps1](start-cluster.ps1): Quick start script (PowerShell)
 - [stop-cluster.ps1](stop-cluster.ps1): Quick destroy script (PowerShell)
 - [backend.md](backend.md): Remote state learning guide
+- [eks.md](eks.md): **Complete EKS guide** (architecture, components, interview scenarios)
 
 **Reference files** (not active, for learning):
 - [bootstrap-state-storage.tf](bootstrap-state-storage.tf): S3 + DynamoDB bootstrap
