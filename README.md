@@ -13,20 +13,20 @@ This folder provisions a complete Amazon EKS environment in your AWS account usi
 
 ## What I built
 
-- [versions.tf](versions.tf): Terraform and provider version constraints + remote state backend config
+- [versions.tf](versions.tf): Terraform and provider version constraints
 - [provider.tf](provider.tf): AWS provider + account/AZ data sources
 - [variables.tf](variables.tf): All configurable inputs
 - [main.tf](main.tf): VPC + EKS module with managed add-ons
 - [outputs.tf](outputs.tf): Cluster endpoint, VPC ID, subnet IDs, add-on status
 - [cluster-autoscaler.tf](cluster-autoscaler.tf): IAM role for Cluster Autoscaler (IRSA)
-- [bootstrap-state-storage.tf](bootstrap-state-storage.tf): S3 bucket + DynamoDB table for remote state
 - [terraform.tfvars.example](terraform.tfvars.example): Example values to copy
-- [modules/state-storage/](modules/state-storage/): Module for provisioning remote state infrastructure
 - [start-cluster.ps1](start-cluster.ps1): Quick start script (PowerShell)
 - [stop-cluster.ps1](stop-cluster.ps1): Quick destroy script (PowerShell)
-- [start-cluster.sh](start-cluster.sh): Quick start script (Bash)
-- [stop-cluster.sh](stop-cluster.sh): Quick destroy script (Bash)
-- [.gitignore](.gitignore): Avoid committing state/secrets (includes kubectl binary)
+- [backend.md](backend.md): Remote state learning guide
+
+**Reference files** (not active, for learning):
+- [bootstrap-state-storage.tf](bootstrap-state-storage.tf): S3 + DynamoDB bootstrap
+- [modules/state-storage/](modules/state-storage/): State infrastructure module
 
 ## Prerequisites
 
@@ -36,44 +36,39 @@ This folder provisions a complete Amazon EKS environment in your AWS account usi
 
 ## Remote State Backend
 
-This project uses **S3 + DynamoDB** for remote state management:
+> **Note**: This project uses **local state** for simplicity (suitable for learning).
+> See [`backend.md`](backend.md) to learn about remote state for team/production use.
 
-- **S3 Bucket**: Stores Terraform state files with versioning and encryption
-- **DynamoDB Table**: Provides state locking to prevent concurrent operations
+State is stored locally in `terraform.tfstate` (gitignored).
 
-### Resources Created
+### Why Local State for This Project?
 
-| Resource | Name | Purpose |
-|----------|------|---------|
-| S3 Bucket | `eks-terraform-state-ap-south-1` | State file storage |
-| DynamoDB Table | `eks-terraform-locks` | State locking |
+| Aspect | Local State | Remote State |
+|--------|-------------|--------------|
+| Complexity | Simple | Requires S3 + DynamoDB setup |
+| Cost | Free | ~$1/month for S3 |
+| Team use | Single developer | Multiple developers |
+| Best for | Learning, personal projects | Production, teams |
 
-### Features
+### Files for Remote State (Reference Only)
 
-- Versioning enabled on S3 bucket
-- Server-side encryption (KMS)
-- Public access blocked
-- `lifecycle { prevent_destroy = true }` on state bucket
-- PAY_PER_REQUEST billing (free tier compatible)
+The following files are included for **learning purposes**. They are not active:
+
+| File | Purpose |
+|------|---------|
+| `bootstrap-state-storage.tf` | Creates S3 + DynamoDB (run once) |
+| `modules/state-storage/` | State infrastructure module |
+| `versions.tf` (commented) | Backend configuration |
+
+To enable remote state in the future, see [`backend.md`](backend.md) for step-by-step instructions.
 
 ## Quick start (PowerShell)
 
-### Step 1: Bootstrap Remote State (First Time Only)
+### Step 1: Bootstrap Remote State (Optional - For Learning)
 
-If this is your first time deploying, create the S3 bucket and DynamoDB table for remote state:
+> **Skip this step for local state.** This is included for learning purposes only.
 
-```powershell
-# Initialize providers (uses local state temporarily)
-terraform init
-
-# Create S3 bucket and DynamoDB table for remote state
-terraform apply -target=module.state_storage
-
-# Uncomment the backend block in versions.tf, then migrate state
-terraform init -migrate-state
-```
-
-After migration, your state will be stored remotely in S3 with DynamoDB locking.
+If you want to use remote state for team collaboration, see [`backend.md`](backend.md) for instructions.
 
 ### Step 2: Deploy EKS Cluster
 
