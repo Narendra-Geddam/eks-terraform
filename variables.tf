@@ -57,3 +57,19 @@ variable "node_max_size" {
   type        = number
   default     = 3
 }
+
+variable "cluster_endpoint_public_access_cidrs" {
+  description = "List of CIDR blocks allowed to access the EKS public API endpoint."
+  type        = list(string)
+  default     = ["0.0.0.0/0"] # Open to all - restrict in production
+}
+
+variable "cluster_addons" {
+  description = "Map of EKS cluster add-ons and their versions."
+  type        = map(string)
+  default = {
+    coredns    = "latest"
+    kube-proxy = "latest"
+    vpc-cni    = "latest"
+  }
+}

@@ -48,12 +48,26 @@ module "eks" {
   cluster_name                             = var.cluster_name
   cluster_version                          = var.kubernetes_version
   cluster_endpoint_public_access           = true
+  cluster_endpoint_public_access_cidrs    = var.cluster_endpoint_public_access_cidrs
   enable_cluster_creator_admin_permissions = true
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
   enable_irsa = true
+
+  # EKS Managed Add-ons
+  cluster_addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
+  }
 
   eks_managed_node_group_defaults = {
     instance_types = var.node_instance_types
@@ -70,5 +84,9 @@ module "eks" {
         role = "general"
       }
     }
+  }
+
+  tags = {
+    "k8s.io/cluster-autoscaler/enabled" = "true"
   }
 }

@@ -37,3 +37,13 @@ output "public_subnet_ids" {
   description = "Public subnet IDs."
   value       = module.vpc.public_subnets
 }
+
+output "cluster_oidc_provider_url" {
+  description = "OIDC provider URL for IRSA (IAM Roles for Service Accounts)."
+  value       = module.eks.oidc_provider
+}
+
+output "cluster_addons" {
+  description = "EKS cluster add-ons status."
+  value       = module.eks.cluster_addons
+}

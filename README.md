@@ -8,24 +8,74 @@ This folder provisions a complete Amazon EKS environment in your AWS account usi
 - EKS control plane
 - EKS managed node group
 - IAM OIDC provider (IRSA support)
+- EKS managed add-ons (coredns, kube-proxy, vpc-cni)
+- Cluster Autoscaler IRSA role (deploy manifest after cluster creation)
 
 ## What I built
 
-- [versions.tf](/c:/Users/don81/OneDrive/Desktop/DevOps/eks/terraform-eks/versions.tf): Terraform and provider version constraints
-- [provider.tf](/c:/Users/don81/OneDrive/Desktop/DevOps/eks/terraform-eks/provider.tf): AWS provider + account/AZ data sources
-- [variables.tf](/c:/Users/don81/OneDrive/Desktop/DevOps/eks/terraform-eks/variables.tf): All configurable inputs
-- [main.tf](/c:/Users/don81/OneDrive/Desktop/DevOps/eks/terraform-eks/main.tf): VPC + EKS infrastructure
-- [outputs.tf](/c:/Users/don81/OneDrive/Desktop/DevOps/eks/terraform-eks/outputs.tf): Useful outputs after apply
-- [terraform.tfvars.example](/c:/Users/don81/OneDrive/Desktop/DevOps/eks/terraform-eks/terraform.tfvars.example): Example values to copy
-- [.gitignore](/c:/Users/don81/OneDrive/Desktop/DevOps/eks/terraform-eks/.gitignore): Avoid committing state/secrets
+- [versions.tf](versions.tf): Terraform and provider version constraints + remote state backend config
+- [provider.tf](provider.tf): AWS provider + account/AZ data sources
+- [variables.tf](variables.tf): All configurable inputs
+- [main.tf](main.tf): VPC + EKS module with managed add-ons
+- [outputs.tf](outputs.tf): Cluster endpoint, VPC ID, subnet IDs, add-on status
+- [cluster-autoscaler.tf](cluster-autoscaler.tf): IAM role for Cluster Autoscaler (IRSA)
+- [bootstrap-state-storage.tf](bootstrap-state-storage.tf): S3 bucket + DynamoDB table for remote state
+- [terraform.tfvars.example](terraform.tfvars.example): Example values to copy
+- [modules/state-storage/](modules/state-storage/): Module for provisioning remote state infrastructure
+- [start-cluster.ps1](start-cluster.ps1): Quick start script (PowerShell)
+- [stop-cluster.ps1](stop-cluster.ps1): Quick destroy script (PowerShell)
+- [start-cluster.sh](start-cluster.sh): Quick start script (Bash)
+- [stop-cluster.sh](stop-cluster.sh): Quick destroy script (Bash)
+- [.gitignore](.gitignore): Avoid committing state/secrets (includes kubectl binary)
 
 ## Prerequisites
 
 - Terraform `>= 1.6.0`
 - AWS CLI configured with credentials that can create VPC, IAM, EKS, EC2, and related resources
-- Optional: `kubectl` to interact with the cluster
+- Optional: `kubectl` to interact with the cluster (use system-wide install, not repo binary)
+
+## Remote State Backend
+
+This project uses **S3 + DynamoDB** for remote state management:
+
+- **S3 Bucket**: Stores Terraform state files with versioning and encryption
+- **DynamoDB Table**: Provides state locking to prevent concurrent operations
+
+### Resources Created
+
+| Resource | Name | Purpose |
+|----------|------|---------|
+| S3 Bucket | `eks-terraform-state-ap-south-1` | State file storage |
+| DynamoDB Table | `eks-terraform-locks` | State locking |
+
+### Features
+
+- Versioning enabled on S3 bucket
+- Server-side encryption (KMS)
+- Public access blocked
+- `lifecycle { prevent_destroy = true }` on state bucket
+- PAY_PER_REQUEST billing (free tier compatible)
 
 ## Quick start (PowerShell)
+
+### Step 1: Bootstrap Remote State (First Time Only)
+
+If this is your first time deploying, create the S3 bucket and DynamoDB table for remote state:
+
+```powershell
+# Initialize providers (uses local state temporarily)
+terraform init
+
+# Create S3 bucket and DynamoDB table for remote state
+terraform apply -target=module.state_storage
+
+# Uncomment the backend block in versions.tf, then migrate state
+terraform init -migrate-state
+```
+
+After migration, your state will be stored remotely in S3 with DynamoDB locking.
+
+### Step 2: Deploy EKS Cluster
 
 1. Move into the project:
 
@@ -76,6 +126,50 @@ Example:
 aws eks update-kubeconfig --region eu-north-1 --name my-eks-cluster
 kubectl get nodes
 ```
+
+## Security: API Endpoint Access
+
+By default, the EKS API endpoint is publicly accessible from any IP (`0.0.0.0/0`). For production, restrict access to specific CIDRs:
+
+```hcl
+# In terraform.tfvars
+cluster_endpoint_public_access_cidrs = [
+  "203.0.113.0/24",  # Office IP range
+  "198.51.100.0/24"  # VPN IP range
+]
+```
+
+To find your current IP:
+```powershell
+(Invoke-WebRequest -Uri "https://checkip.amazonaws.com").Content
+```
+
+## Cluster Autoscaler
+
+The Cluster Autoscaler automatically adjusts node count based on workload demand.
+
+### What's Created
+- IAM policy for ASG management
+- IAM role with IRSA (IAM Roles for Service Accounts)
+- Kubernetes manifest (ServiceAccount, ClusterRole, Deployment)
+
+### Deploy After Cluster Creation
+
+```powershell
+# Get cluster outputs
+terraform output cluster_autoscaler_role_arn
+
+# Apply the Kubernetes manifest
+terraform output -raw cluster_autoscaler_manifest | kubectl apply -f -
+
+# Verify it's running
+kubectl get pods -n kube-system -l app=cluster-autoscaler
+```
+
+### How It Works
+- Watches for unschedulable pods → adds nodes
+- Scales down when nodes are underutilized
+- Uses tags on node groups: `k8s.io/cluster-autoscaler/enabled` and `k8s.io/cluster-autoscaler/<cluster-name>`
 
 ## First-time access checklist (EKS managed)
 
@@ -272,6 +366,59 @@ Replace `<account-id>` with your AWS account ID.
 - `No nodes found`: The cluster control plane is up, but node group is still creating.
   Wait a few minutes and re-run `kubectl get nodes`.
 
+## Cost Management
+
+### Estimated Monthly Costs
+
+| Resource | Always Running | Per Hour |
+|----------|----------------|----------|
+| EKS Control Plane | ~$72/month | $0.10/hour |
+| NAT Gateway | ~$32/month | $0.045/hour |
+| t3.medium EC2 (×2) | ~$60/month | $0.084/hour |
+| EBS Volumes | ~$6/month | - |
+| **Total (24/7)** | **~$170/month** | - |
+
+### Cost Optimization for Dev/Learning
+
+For occasional use (4-6 hours, 3-5 times/week), **destroy infrastructure after each session**:
+
+| Usage | Estimated Cost |
+|-------|----------------|
+| 4 hrs × 3 sessions/week | ~$11/month |
+| 6 hrs × 5 sessions/week | ~$27/month |
+
+### Quick Start/Stop Scripts
+
+Use the provided scripts to easily start and stop your cluster:
+
+**PowerShell (Windows):**
+```powershell
+# Start cluster (15-25 min)
+.\start-cluster.ps1
+
+# Stop cluster and save costs
+.\stop-cluster.ps1
+```
+
+**Bash (Linux/Mac):**
+```bash
+# Start cluster (15-25 min)
+./start-cluster.sh
+
+# Stop cluster and save costs
+./stop-cluster.sh
+```
+
+### Manual Commands
+
+```powershell
+# Start: Apply all infrastructure
+terraform apply
+
+# Stop: Destroy everything (stops all costs)
+terraform destroy
+```
+
 ## Destroy (cleanup)
 
 ```powershell
@@ -284,10 +431,31 @@ terraform destroy
 - The IAM identity running Terraform gets EKS admin access (`enable_cluster_creator_admin_permissions = true`).
 - Node group defaults use `t3.medium` and on-demand capacity.
 - NAT gateway is set to single for lower cost in non-production.
+- EKS managed add-ons (coredns, kube-proxy, vpc-cni) are enabled by default.
+- Cluster Autoscaler requires manual manifest deployment after cluster creation (see README).
+- API endpoint is publicly accessible by default — restrict CIDRs for production.
 
 ## Suggested next improvements
 
-1. Use remote state (S3 + DynamoDB lock).
-2. Restrict API endpoint access CIDRs.
-3. Add add-ons (AWS Load Balancer Controller, metrics-server, ExternalDNS) through Terraform.
-4. Replace broad admin access with fine-grained EKS access entries and Kubernetes RBAC groups.
+1. ~~Use remote state (S3 + DynamoDB lock).~~ ✅ Done
+2. ~~Restrict API endpoint access CIDRs for production clusters.~~ ✅ Done (variable added, configure in tfvars)
+3. ~~Add EKS managed add-ons (coredns, kube-proxy, vpc-cni).~~ ✅ Done
+4. ~~Implement Cluster Autoscaler for dynamic scaling.~~ ✅ Done (IRSA role + manifest)
+5. Add AWS Load Balancer Controller for Ingress support.
+6. Add Metrics Server for `kubectl top` and HPA.
+7. Add CloudWatch Container Insights for monitoring.
+8. Replace broad admin access with fine-grained EKS access entries and Kubernetes RBAC groups.
+
+## Recent Changes
+
+### 2024-03
+- Added remote state backend with S3 + DynamoDB
+- Created `modules/state-storage/` for bootstrap resources
+- Added `bootstrap-state-storage.tf` for state infrastructure
+- Added EKS managed add-ons (coredns, kube-proxy, vpc-cni)
+- Added Cluster Autoscaler IRSA role and Kubernetes manifest
+- Added `cluster_endpoint_public_access_cidrs` variable for API security
+- Added start/stop scripts for cost management
+- Added cost estimation and optimization guide
+- Removed `kubectl` binary from repository (use system-wide install)
+- Updated `.gitignore` to exclude kubectl binary
