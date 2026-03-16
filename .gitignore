@@ -7,3 +7,4 @@ terraform.tfstate.backup
 plan.out
 
 kubectl
+iam_policy.json
