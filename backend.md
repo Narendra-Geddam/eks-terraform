@@ -18,7 +18,8 @@
 
 ---
 
-> 📖 **Learning Note**: This project uses **local state** for simplicity. This document explains remote state concepts for future reference when working with teams or production environments.
+> 📖 **Learning Note**: This project uses **local state** for simplicity. This document explains remote state concepts for future reference when working with teams or production environments.  
+> **Lab Note**: We removed `prevent_destroy` from the state-storage module so a full `terraform destroy` works in labs.
 
 ---
 
@@ -180,9 +181,8 @@ module "state_storage" {
 resource "aws_s3_bucket" "terraform_state" {
   bucket = var.bucket_name
 
-  lifecycle {
-    prevent_destroy = true  # Prevent accidental deletion
-  }
+  # In production, set prevent_destroy = true to protect the state bucket.
+  # For labs/local-state workflows, keep it disabled so destroy works.
 }
 
 # Enable Versioning
@@ -440,7 +440,8 @@ Error: AccessDenied: User is not authorized
 2. **Enable versioning** - Always enable S3 versioning
 3. **Enable encryption** - Use KMS encryption
 4. **Block public access** - Always block public access
-5. **Use lifecycle prevent_destroy** - Prevent accidental bucket deletion
+5. **Use lifecycle prevent_destroy in production** - Protects the state bucket.  
+   **Disable it in labs** if you need a full teardown.
 6. **Separate state per environment** - Use different keys or buckets for dev/staging/prod
 
 ---

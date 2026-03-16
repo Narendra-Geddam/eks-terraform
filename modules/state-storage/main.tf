@@ -2,10 +2,7 @@
 resource "aws_s3_bucket" "terraform_state" {
   bucket = var.bucket_name
 
-  # Prevent accidental deletion of state bucket
-  lifecycle {
-    prevent_destroy = true
-  }
+  # Allow full teardown in lab/local-state usage
 
   tags = {
     Name        = var.bucket_name
