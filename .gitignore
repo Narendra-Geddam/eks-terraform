@@ -2,6 +2,8 @@
 .terraform.lock.hcl
 terraform.tfstate
 terraform.tfstate.backup
+terraform.tfstate.*.backup
+.terraform.tfstate.lock.info
 *.tfvars
 !terraform.tfvars.example
 plan.out
