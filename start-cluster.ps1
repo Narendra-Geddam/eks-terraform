@@ -89,10 +89,9 @@ Write-Host ""
 Write-Host "Planning infrastructure changes..." -ForegroundColor Green
 terraform plan -out=tfplan | Select-Object -Last 20
 
-$confirm = Read-Host ""
 Write-Host ""
-Write-Host "Confirm deployment? (yes/no)"
-$proceed = Read-Host ""
+Write-Host "Confirm deployment? (yes/no)" -ForegroundColor Yellow
+$proceed = Read-Host "Enter 'yes' to proceed"
 
 if ($proceed -ne "yes") {
     Write-Host "Cancelled." -ForegroundColor Yellow
