@@ -1,0 +1,107 @@
+# ALB Ingress with both HTTP (80) and HTTPS (443) listeners
+# 
+# Prerequisites:
+# 1. Have an ACM certificate in your AWS region
+# 2. Get the ACM certificate ARN from AWS Console or CLI:
+#    aws acm list-certificates --region eu-north-1
+#
+# Replace YOUR_CERT_ARN with your actual certificate ARN
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - name: nginx
+        image: public.ecr.aws/nginx/nginx:latest
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: web-app
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-app-alb
+  namespace: default
+  annotations:
+    # ALB controller class
+    kubernetes.io/ingress.class: alb
+    
+    # ALB type (application load balancer)
+    alb.ingress.kubernetes.io/load-balancer-name: web-app-alb
+    
+    # Internet-facing (accessible from the internet)
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    
+    # Target type: ip (pods in cluster)
+    alb.ingress.kubernetes.io/target-type: ip
+    
+    # IMPORTANT: Listen on both HTTP (80) and HTTPS (443)
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    
+    # SSL/TLS certificate ARN from AWS Certificate Manager
+    # Get your certificate ARN with:
+    #   aws acm list-certificates --region eu-north-1
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-north-1:YOUR_ACCOUNT_ID:certificate/YOUR_CERT_ID
+    
+    # Redirect HTTP to HTTPS (optional)
+    # Remove this line if you want HTTP to work without redirecting
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    
+    # SSL/TLS policy (optional - use latest for best security)
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+    
+    # Group Ingresses together into one ALB (optional)
+    # alb.ingress.kubernetes.io/group.name: web-app-group
+    # alb.ingress.kubernetes.io/group.order: '1'
+    
+    # Add tags to the ALB (optional)
+    alb.ingress.kubernetes.io/tags: Environment=dev,Team=platform
+    
+spec:
+  rules:
+  # HTTP rules (port 80)
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-app
+            port:
+              number: 80
+  
+  # HTTPS rules (port 443)
+  - https:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-app
+            port:
+              number: 80
