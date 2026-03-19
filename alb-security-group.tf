@@ -43,10 +43,6 @@ resource "aws_security_group_rule" "alb_http" {
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = data.aws_security_groups.alb.ids[0]
   description       = "Allow HTTP traffic to ALB"
-
-  tags = {
-    Name = "alb-http"
-  }
 }
 
 # Allow HTTPS traffic (port 443) to ALB from anywhere
@@ -60,10 +56,6 @@ resource "aws_security_group_rule" "alb_https" {
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = data.aws_security_groups.alb.ids[0]
   description       = "Allow HTTPS traffic to ALB"
-
-  tags = {
-    Name = "alb-https"
-  }
 }
 
 # Allow ALB to send traffic to nodes on port 80 (HTTP)
