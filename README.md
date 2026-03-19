@@ -316,7 +316,101 @@ cluster_endpoint_public_access_cidrs = ["203.0.113.0/24"]  # Office IP
 
 ---
 
-## 🛡️ Security Best Practices
+## �️ Remote State Backend
+
+By default, this project uses **local state** for simplicity. For team collaboration and production environments, you can enable remote state management with **S3 + DynamoDB**.
+
+<details>
+<summary><b>📚 Why Remote State?</b></summary>
+
+| Benefit | Description |
+|---------|-------------|
+| **Team Collaboration** | Multiple developers can safely work on the same infrastructure with state locking |
+| **State Locking** | DynamoDB prevents concurrent operations from corrupting state |
+| **Security** | S3 encryption at rest protects sensitive data (passwords, keys) |
+| **Versioning** | S3 versioning keeps history of all state changes for recovery |
+| **Centralized** | No need to share state files via email or version control |
+
+</details>
+
+<details>
+<summary><b>⚙️ Enable Remote State (Bootstrap)</b></summary>
+
+### Step 1: Initialize with Local State
+```bash
+terraform init
+```
+
+### Step 2: Create S3 Bucket and DynamoDB Table
+```bash
+terraform apply -target=module.state_storage
+```
+
+### Step 3: Uncomment Backend in `versions.tf`
+
+Edit `versions.tf` and uncomment the backend block:
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "eks-terraform-state-ap-south-1"
+    key            = "eks/terraform.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "eks-terraform-locks"
+    encrypt        = true
+  }
+}
+```
+
+### Step 4: Migrate State
+```bash
+terraform init -migrate-state
+# Choose 'yes' when prompted to copy state
+```
+
+### Architecture
+```
+Your Computer              AWS Cloud
+    │                    ┌─────────────────┐
+    │ terraform apply    │   DynamoDB      │
+    ├──────────────────► │  (State Lock)   │
+    │                    └────────┬────────┘
+    │                             │
+    │                    ┌────────▼────────┐
+    │                    │  S3 Bucket      │
+    │                    │ (State File)    │
+    │                    │ - Versioning    │
+    │                    │ - Encryption    │
+    │                    │ - Backups       │
+    │                    └─────────────────┘
+```
+
+### Backend Configuration
+
+| File | Purpose |
+|------|---------|
+| `versions.tf` | Backend configuration (comment/uncomment to toggle) |
+| `bootstrap-state-storage.tf` | Defines S3 + DynamoDB resources |
+| `modules/state-storage/` | Reusable module for state infrastructure |
+
+**Cost**: ~$2/month (pay-per-request billing)
+
+</details>
+
+<details>
+<summary><b>📖 Full Remote State Guide</b></summary>
+
+See [**backend.md**](backend.md) for comprehensive documentation on:
+- Terraform state concepts
+- Local vs remote state comparison
+- Bootstrap sequence
+- Troubleshooting state issues
+- Migration from local to remote state
+
+</details>
+
+---
+
+## �🛡️ Security Best Practices
 
 <div align="center">
 

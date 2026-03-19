@@ -97,42 +97,70 @@ Write-Host "  Phase 2: Destroying Infrastructure (Terraform)" -ForegroundColor C
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
 
-terraform destroy --auto-approve
+$destroyOutput = terraform destroy --auto-approve 2>&1
+
+# Check if destroy succeeded
+$destroySuccess = $LASTEXITCODE -eq 0
+
+Write-Host ""
+if ($destroySuccess) {
+    Write-Host "✅ Terraform destroy completed successfully" -ForegroundColor Green
+} else {
+    Write-Host "⚠️  Terraform destroy had errors - checking what failed..." -ForegroundColor Yellow
+    $destroyOutput | Select-String -Pattern "Error|error" | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+}
 
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "  Phase 3: Cleanup" -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 
-# Clean up local Terraform files
-Write-Host ""
-Write-Host "Cleaning up Terraform state files..." -ForegroundColor Green
-if (Test-Path .terraform) {
-    Remove-Item -Recurse -Force .terraform 2>$null | Out-Null
-    Write-Host "  ✓ Removed .terraform directory"
+# IMPORTANT: Only delete state files if destroy was successful
+if ($destroySuccess) {
+    Write-Host ""
+    Write-Host "Cleaning up local Terraform files..." -ForegroundColor Green
+    if (Test-Path .terraform) {
+        Remove-Item -Recurse -Force .terraform 2>$null | Out-Null
+        Write-Host "  ✓ Removed .terraform directory"
+    }
+
+    if (Test-Path terraform.tfstate) {
+        Remove-Item -Force terraform.tfstate 2>$null | Out-Null
+        Write-Host "  ✓ Removed terraform.tfstate"
+    }
+
+    if (Test-Path terraform.tfstate.backup) {
+        Remove-Item -Force terraform.tfstate.backup 2>$null | Out-Null
+        Write-Host "  ✓ Removed terraform.tfstate.backup"
+    }
+
+    # Clean up old backup files
+    Get-ChildItem terraform.tfstate.*.backup -ErrorAction SilentlyContinue | ForEach-Object {
+        Remove-Item $_ -Force 2>$null
+        Write-Host "  ✓ Removed $($_.Name)"
+    }
+
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor Cyan
+    Write-Host "  ✅ Cluster Successfully Destroyed!" -ForegroundColor Green
+    Write-Host "  💰 All costs have stopped" -ForegroundColor Green
+    Write-Host "==========================================" -ForegroundColor Cyan
+} else {
+    Write-Host ""
+    Write-Host "❌ DESTRUCTION FAILED - STATE FILES PRESERVED" -ForegroundColor Red
+    Write-Host "==========================================" -ForegroundColor Cyan
+    Write-Host "  State files kept so you can retry cleanup:" -ForegroundColor Yellow
+    Write-Host "  - terraform.tfstate (exists)" -ForegroundColor Yellow
+    Write-Host "  - .terraform/ directory (exists)" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  To retry:" -ForegroundColor Yellow
+    Write-Host "    1. Fix the errors above" -ForegroundColor Yellow
+    Write-Host "    2. Run: terraform destroy --auto-approve" -ForegroundColor Yellow
+    Write-Host "    3. Run this script again: .\stop-cluster.ps1" -ForegroundColor Yellow
+    Write-Host "==========================================" -ForegroundColor Cyan
+    exit 1
 }
 
-if (Test-Path terraform.tfstate) {
-    Remove-Item -Force terraform.tfstate 2>$null | Out-Null
-    Write-Host "  ✓ Removed terraform.tfstate"
-}
-
-if (Test-Path terraform.tfstate.backup) {
-    Remove-Item -Force terraform.tfstate.backup 2>$null | Out-Null
-    Write-Host "  ✓ Removed terraform.tfstate.backup"
-}
-
-# Clean up old backup files
-Get-ChildItem terraform.tfstate.*.backup -ErrorAction SilentlyContinue | ForEach-Object {
-    Remove-Item $_ -Force 2>$null
-    Write-Host "  ✓ Removed $($_.Name)"
-}
-
-Write-Host ""
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "  ✅ Cluster Completely Destroyed!" -ForegroundColor Green
-Write-Host "  💰 All costs have stopped" -ForegroundColor Green
-Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Verify resources deleted in AWS Console: https://console.aws.amazon.com" -ForegroundColor Gray
