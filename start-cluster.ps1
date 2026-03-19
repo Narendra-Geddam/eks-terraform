@@ -115,6 +115,28 @@ $startTime = Get-Date
 terraform apply tfplan
 $duration = (Get-Date) - $startTime
 
+# Deploy ALB controller if not already present (handles timing issues)
+Write-Host ""
+Write-Host "Ensuring ALB controller deployment..." -ForegroundColor Green
+$albServiceAccount = kubectl -n kube-system get serviceaccount aws-load-balancer-controller -o name 2>$null
+if ($albServiceAccount) {
+    Write-Host "  ℹ️  Service account exists, verifying Helm release..."
+    $albRelease = helm list -n kube-system 2>$null | Select-String "aws-load-balancer-controller"
+    if (-not $albRelease) {
+        Write-Host "  ⚠️  Helm release missing, deploying..." -ForegroundColor Yellow
+        terraform apply -target="helm_release.alb_controller" -auto-approve 2>&1 | Out-Null
+        Start-Sleep -Seconds 10
+        Write-Host "  ✓ Helm release deployed"
+    } else {
+        Write-Host "  ✓ Helm release already deployed"
+    }
+} else {
+    Write-Host "  ⚠️  Service account missing, deploying ALB controller..." -ForegroundColor Yellow
+    terraform apply -target="kubernetes_service_account.alb_controller" -target="helm_release.alb_controller" -auto-approve 2>&1 | Out-Null
+    Start-Sleep -Seconds 10
+    Write-Host "  ✓ ALB controller deployed"
+}
+
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "  Phase 5: Post-Deployment Configuration" -ForegroundColor Cyan
