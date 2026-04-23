@@ -73,3 +73,9 @@ variable "cluster_addons" {
     vpc-cni    = "latest"
   }
 }
+
+variable "enable_kubernetes_resources" {
+  description = "Controls whether Kubernetes and Helm resources are managed by Terraform. Disable during initial bootstrap, enable after the cluster exists."
+  type        = bool
+  default     = true
+}

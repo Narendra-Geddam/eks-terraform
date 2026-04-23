@@ -76,6 +76,8 @@ module "eks" {
 
   eks_managed_node_groups = {
     default = {
+      name          = "default"
+      use_name_prefix = false
       min_size      = var.node_min_size
       max_size      = var.node_max_size
       desired_size  = var.node_desired_size

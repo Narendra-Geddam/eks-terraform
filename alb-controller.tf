@@ -34,6 +34,8 @@ resource "aws_iam_role_policy_attachment" "alb_controller" {
 
 # Kubernetes Service Account with IRSA annotation
 resource "kubernetes_service_account" "alb_controller" {
+  count = var.enable_kubernetes_resources ? 1 : 0
+
   metadata {
     name      = "aws-load-balancer-controller"
     namespace = "kube-system"
@@ -50,6 +52,8 @@ resource "kubernetes_service_account" "alb_controller" {
 
 # Helm release for ALB Controller
 resource "helm_release" "alb_controller" {
+  count = var.enable_kubernetes_resources ? 1 : 0
+
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
@@ -68,7 +72,7 @@ resource "helm_release" "alb_controller" {
 
   set {
     name  = "serviceAccount.name"
-    value = kubernetes_service_account.alb_controller.metadata[0].name
+    value = kubernetes_service_account.alb_controller[0].metadata[0].name
   }
 
   set {
@@ -96,5 +100,5 @@ output "alb_controller_role_arn" {
 
 output "alb_controller_deployment_status" {
   description = "ALB controller deployment information"
-  value       = "ALB controller deployed to kube-system namespace - run: kubectl -n kube-system get deployment aws-load-balancer-controller"
+  value       = var.enable_kubernetes_resources ? "ALB controller deployed to kube-system namespace - run: kubectl -n kube-system get deployment aws-load-balancer-controller" : "ALB controller disabled until Kubernetes resources are enabled"
 }

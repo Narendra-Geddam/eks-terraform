@@ -84,14 +84,34 @@ echo "=========================================="
 
 echo ""
 echo "Planning infrastructure changes..."
-terraform plan -out=tfplan | tail -20
+set +e
+PLAN_OUTPUT=$(terraform plan -detailed-exitcode -out=tfplan 2>&1)
+PLAN_EXIT_CODE=$?
+set -e
 
-echo ""
-read -p "Confirm deployment? (yes/no): " confirm
+if [ $PLAN_EXIT_CODE -eq 1 ]; then
+    echo ""
+    echo "  ✗ Terraform plan failed"
+    echo "$PLAN_OUTPUT" | tail -40
+    exit 1
+fi
 
-if [ "$confirm" != "yes" ]; then
-    echo "❌ Cancelled."
-    exit 0
+HAS_CHANGES=false
+if [ $PLAN_EXIT_CODE -eq 2 ]; then
+    HAS_CHANGES=true
+    echo "$PLAN_OUTPUT" | tail -20
+else
+    echo "  ✓ No infrastructure changes detected (idempotent run)"
+fi
+
+if [ "$HAS_CHANGES" = true ]; then
+    echo ""
+    read -p "Confirm deployment? (yes/no): " confirm
+
+    if [ "$confirm" != "yes" ]; then
+        echo "❌ Cancelled."
+        exit 0
+    fi
 fi
 
 echo ""
@@ -108,7 +128,11 @@ echo "   - Cluster autoscaler"
 echo ""
 
 START_TIME=$(date +%s)
-terraform apply tfplan
+if [ "$HAS_CHANGES" = true ]; then
+    terraform apply tfplan
+else
+    echo "Skipping apply because there are no pending changes."
+fi
 END_TIME=$(date +%s)
 DURATION=$((($END_TIME - $START_TIME) / 60))
 
