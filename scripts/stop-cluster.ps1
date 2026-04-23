@@ -1,6 +1,10 @@
 # EKS Cluster Shutdown (PowerShell)
-# Usage: .\stop-cluster.ps1
+# Usage: .\scripts\stop-cluster.ps1
 # This script cleanly destroys all infrastructure including ALBs, services, and Terraform resources
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$TerraformDir = (Resolve-Path (Join-Path $ScriptDir "..\infra\environments\prod")).Path
+Set-Location $TerraformDir
 
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "  EKS Cluster Destruction Script" -ForegroundColor Cyan
@@ -156,7 +160,7 @@ if ($destroySuccess) {
     Write-Host "  To retry:" -ForegroundColor Yellow
     Write-Host "    1. Fix the errors above" -ForegroundColor Yellow
     Write-Host "    2. Run: terraform destroy --auto-approve" -ForegroundColor Yellow
-    Write-Host "    3. Run this script again: .\stop-cluster.ps1" -ForegroundColor Yellow
+    Write-Host "    3. Run this script again: ..\..\..\scripts\stop-cluster.ps1" -ForegroundColor Yellow
     Write-Host "==========================================" -ForegroundColor Cyan
     exit 1
 }
@@ -165,5 +169,5 @@ Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Verify resources deleted in AWS Console: https://console.aws.amazon.com" -ForegroundColor Gray
 Write-Host "  2. Check S3 bucket emptied (state bucket): eks-terraform-state-*" -ForegroundColor Gray
-Write-Host "  3. To redeploy: Run .\start-cluster.ps1" -ForegroundColor Gray
+Write-Host "  3. To redeploy: Run ..\..\..\scripts\start-cluster.ps1" -ForegroundColor Gray
 Write-Host ""

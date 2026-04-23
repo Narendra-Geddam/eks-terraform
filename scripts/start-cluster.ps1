@@ -1,8 +1,12 @@
 # EKS Cluster Startup Script (PowerShell)
-# Usage: .\start-cluster.ps1
+# Usage: .\scripts\start-cluster.ps1
 # Deploys complete EKS cluster with VPC, nodes, ALB controller, and monitoring
 
 $ErrorActionPreference = "Stop"
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$TerraformDir = (Resolve-Path (Join-Path $ScriptDir "..\infra\environments\prod")).Path
+Set-Location $TerraformDir
 
 function Assert-LastExitCode {
     param(
@@ -414,11 +418,11 @@ Write-Host "   kubectl -n kube-system get deployment aws-load-balancer-controlle
 Write-Host "   kubectl -n kube-system logs -l app.kubernetes.io/name=aws-load-balancer-controller --tail=50" -ForegroundColor Gray
 Write-Host ""
 Write-Host "3. Deploy a test application with ALB:" -ForegroundColor White
-Write-Host "   See alb.md for examples" -ForegroundColor Gray
+Write-Host "   See docs/guides/alb.md for examples" -ForegroundColor Gray
 Write-Host ""
 Write-Host "4. Monitor cluster autoscaling:" -ForegroundColor White
 Write-Host "   kubectl -n kube-system logs -l app.kubernetes.io/name=aws-cluster-autoscaler" -ForegroundColor Gray
 Write-Host ""
 Write-Host "5. Destroy cluster when done:" -ForegroundColor White
-Write-Host "   .\stop-cluster.ps1" -ForegroundColor Gray
+Write-Host "   ..\..\..\scripts\stop-cluster.ps1" -ForegroundColor Gray
 Write-Host ""

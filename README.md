@@ -100,47 +100,47 @@ Cost: ~$11-27/month
 <th>Status</th>
 </tr>
 <tr>
-<td><code>main.tf</code></td>
+<td><code>infra/environments/prod/main.tf</code></td>
 <td>VPC + EKS + Add-ons configuration</td>
 <td>✅ Active</td>
 </tr>
 <tr>
-<td><code>variables.tf</code></td>
+<td><code>infra/environments/prod/variables.tf</code></td>
 <td>Input variables</td>
 <td>✅ Active</td>
 </tr>
 <tr>
-<td><code>outputs.tf</code></td>
+<td><code>infra/environments/prod/outputs.tf</code></td>
 <td>Cluster outputs (endpoint, VPC ID)</td>
 <td>✅ Active</td>
 </tr>
 <tr>
-<td><code>cluster-autoscaler.tf</code></td>
+<td><code>infra/environments/prod/cluster-autoscaler.tf</code></td>
 <td>IRSA role for Cluster Autoscaler</td>
 <td>✅ Active</td>
 </tr>
 <tr>
-<td><code>versions.tf</code></td>
+<td><code>infra/environments/prod/versions.tf</code></td>
 <td>Terraform & provider versions</td>
 <td>✅ Active</td>
 </tr>
 <tr>
-<td><code>start-cluster.ps1</code></td>
+<td><code>scripts/start-cluster.ps1</code></td>
 <td>Quick start script</td>
 <td>✅ Active</td>
 </tr>
 <tr>
-<td><code>stop-cluster.ps1</code></td>
+<td><code>scripts/stop-cluster.ps1</code></td>
 <td>Quick destroy script</td>
 <td>✅ Active</td>
 </tr>
 <tr>
-<td><code>backend.md</code></td>
+<td><code>docs/guides/backend.md</code></td>
 <td>Remote state learning guide</td>
 <td>📖 Documentation</td>
 </tr>
 <tr>
-<td><code>eks.md</code></td>
+<td><code>docs/guides/eks.md</code></td>
 <td>Complete EKS guide + Interview prep</td>
 <td>📖 Documentation</td>
 </tr>
@@ -151,8 +151,8 @@ Cost: ~$11-27/month
 
 | File | Purpose |
 |------|---------|
-| `bootstrap-state-storage.tf` | S3 + DynamoDB for remote state |
-| `modules/state-storage/` | State infrastructure module |
+| `infra/environments/prod/bootstrap-state-storage.tf` | S3 + DynamoDB for remote state |
+| `infra/modules/state-storage/` | State infrastructure module |
 
 </details>
 
@@ -175,6 +175,7 @@ Cost: ~$11-27/month
 # Clone the repository
 git clone <your-repo-url>
 cd terraform-eks
+cd infra/environments/prod
 
 # Copy example variables
 Copy-Item terraform.tfvars.example terraform.tfvars
@@ -219,7 +220,7 @@ kubectl get pods -n kube-system -l app=cluster-autoscaler
 
 ```powershell
 # Use the provided script
-.\stop-cluster.ps1
+..\..\..\scripts\stop-cluster.ps1
 
 # Or manually
 terraform destroy
@@ -259,7 +260,7 @@ terraform destroy
 <details>
 <summary>💡 Cost Optimization Tips</summary>
 
-1. **Destroy after use** - Use `stop-cluster.ps1` when done
+1. **Destroy after use** - Use `scripts/stop-cluster.ps1` when done
 2. **Use Spot instances** - 70-90% cheaper (for fault-tolerant workloads)
 3. **Scale to zero** - Set `min_size = 0` in dev environments
 4. **Right-size nodes** - Monitor usage with `kubectl top nodes`
@@ -274,8 +275,8 @@ terraform destroy
 
 | Document | Description |
 |----------|-------------|
-| [**eks.md**](eks.md) | Complete EKS guide - architecture, components, interview scenarios |
-| [**backend.md**](backend.md) | Remote state concepts - S3 + DynamoDB backend |
+| [**docs/guides/eks.md**](docs/guides/eks.md) | Complete EKS guide - architecture, components, interview scenarios |
+| [**docs/guides/backend.md**](docs/guides/backend.md) | Remote state concepts - S3 + DynamoDB backend |
 
 </div>
 
@@ -298,7 +299,7 @@ terraform destroy
 | `node_max_size` | `3` | Maximum nodes |
 | `cluster_endpoint_public_access_cidrs` | `["0.0.0.0/0"]` | Allowed CIDRs for API access |
 
-Edit `terraform.tfvars` to customize:
+Edit `infra/environments/prod/terraform.tfvars` to customize:
 
 ```hcl
 # terraform.tfvars
@@ -399,7 +400,7 @@ Your Computer              AWS Cloud
 <details>
 <summary><b>📖 Full Remote State Guide</b></summary>
 
-See [**backend.md**](backend.md) for comprehensive documentation on:
+See [**docs/guides/backend.md**](docs/guides/backend.md) for comprehensive documentation on:
 - Terraform state concepts
 - Local vs remote state comparison
 - Bootstrap sequence
@@ -497,8 +498,8 @@ cluster_endpoint_public_access_cidrs = [
 - ✅ Added Cluster Autoscaler IRSA role
 - ✅ Added API endpoint CIDR restrictions variable
 - ✅ Added start/stop scripts for cost management
-- ✅ Added comprehensive `eks.md` documentation
-- ✅ Added `backend.md` for learning
+- ✅ Added comprehensive `docs/guides/eks.md` documentation
+- ✅ Added `docs/guides/backend.md` for learning
 - ✅ Removed kubectl binary from repository
 
 </details>
@@ -529,6 +530,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <img src="https://img.shields.io/badge/⭐-If%20this%20helped%20you-blue?style=for-the-badge" alt="Star"/>
 
-[**📚 Read the Full EKS Guide**](eks.md) | [**📚 Remote State Guide**](backend.md)
+[**📚 Read the Full EKS Guide**](docs/guides/eks.md) | [**📚 Remote State Guide**](docs/guides/backend.md)
 
 </div>

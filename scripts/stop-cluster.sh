@@ -1,9 +1,13 @@
 #!/bin/bash
 # Stop and destroy EKS cluster with comprehensive cleanup
-# Usage: ./stop-cluster.sh
+# Usage: ./scripts/stop-cluster.sh
 # Cleans all Kubernetes resources, Helm releases, and destroys infrastructure
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TERRAFORM_DIR="$(cd "$SCRIPT_DIR/../infra/environments/prod" && pwd)"
+cd "$TERRAFORM_DIR"
 
 echo "=========================================="
 echo "  EKS Cluster Destruction Script"
@@ -133,5 +137,5 @@ echo ""
 echo "Next steps:"
 echo "  1. Verify resources deleted in AWS Console: https://console.aws.amazon.com"
 echo "  2. Check S3 bucket emptied (state bucket): eks-terraform-state-*"
-echo "  3. To redeploy: Run ./start-cluster.sh"
+echo "  3. To redeploy: Run ../../../scripts/start-cluster.sh"
 echo ""

@@ -1,9 +1,13 @@
 #!/bin/bash
 # EKS Cluster Startup Script (Bash)
-# Usage: ./start-cluster.sh
+# Usage: ./scripts/start-cluster.sh
 # Deploys complete EKS cluster with VPC, nodes, ALB controller, and monitoring
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TERRAFORM_DIR="$(cd "$SCRIPT_DIR/../infra/environments/prod" && pwd)"
+cd "$TERRAFORM_DIR"
 
 echo "=========================================="
 echo "  EKS Cluster Deployment Script"
@@ -214,11 +218,11 @@ echo "   kubectl -n kube-system get deployment aws-load-balancer-controller"
 echo "   kubectl -n kube-system logs -l app.kubernetes.io/name=aws-load-balancer-controller --tail=50"
 echo ""
 echo "3. Deploy a test application with ALB:"
-echo "   See alb.md for examples"
+echo "   See docs/guides/alb.md for examples"
 echo ""
 echo "4. Monitor cluster autoscaling:"
 echo "   kubectl -n kube-system logs -l app.kubernetes.io/name=aws-cluster-autoscaler"
 echo ""
 echo "5. Destroy cluster when done:"
-echo "   ./stop-cluster.sh"
+echo "   ../../../scripts/stop-cluster.sh"
 echo ""

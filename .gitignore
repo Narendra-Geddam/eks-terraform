@@ -1,12 +1,12 @@
-.terraform/
-.terraform.lock.hcl
-terraform.tfstate
-terraform.tfstate.backup
-terraform.tfstate.*.backup
-.terraform.tfstate.lock.info
-*.tfvars
-!terraform.tfvars.example
-plan.out
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/terraform.tfstate.*.backup
+**/.terraform.tfstate.lock.info
+infra/environments/*/terraform.tfvars
+!infra/environments/*/terraform.tfvars.example
+**/plan.out
+**/tfplan
 
 kubectl
-iam_policy.json
+policies/iam_policy.json

@@ -12,7 +12,7 @@
 
 # Note: Using a separate module call to keep resource management clean
 module "state_storage" {
-  source = "./modules/state-storage"
+  source = "../../modules/state-storage"
 
   bucket_name      = "eks-terraform-state-ap-south-1"
   dynamodb_table   = "eks-terraform-locks"
