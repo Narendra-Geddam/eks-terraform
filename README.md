@@ -126,12 +126,22 @@ Cost: ~$11-27/month
 </tr>
 <tr>
 <td><code>scripts/start-cluster.ps1</code></td>
-<td>Quick start script</td>
+<td>PowerShell - Deploy EKS cluster</td>
 <td>✅ Active</td>
 </tr>
 <tr>
 <td><code>scripts/stop-cluster.ps1</code></td>
-<td>Quick destroy script</td>
+<td>PowerShell - Destroy cluster & cleanup</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><code>scripts/start-cluster.sh</code></td>
+<td>Bash - Deploy EKS cluster</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><code>scripts/stop-cluster.sh</code></td>
+<td>Bash - Destroy cluster & cleanup</td>
 <td>✅ Active</td>
 </tr>
 <tr>
@@ -161,7 +171,7 @@ Cost: ~$11-27/month
 ## ⚡ Quick Start
 
 <details open>
-<summary><b>🚀 Deploy EKS Cluster</b></summary>
+<summary><b>🚀 Deploy EKS Cluster (PowerShell)</b></summary>
 
 ### Prerequisites
 
@@ -169,47 +179,84 @@ Cost: ~$11-27/month
 - AWS CLI configured with credentials
 - kubectl (optional, for cluster interaction)
 
-### Step 1: Initialize & Deploy
+### Using PowerShell Script (Easiest)
 
 ```powershell
-# Clone the repository
-git clone <your-repo-url>
-cd terraform-eks
+# From repository root
+.\scripts\start-cluster.ps1
+
+# Wait 15-25 minutes for deployment...
+# Script handles terraform init, plan, apply, and post-deployment config
+```
+
+### Manual Terraform Commands
+
+```powershell
 cd infra/environments/prod
-
-# Copy example variables
-Copy-Item terraform.tfvars.example terraform.tfvars
-
-# Edit variables (optional)
-# Notepad terraform.tfvars
-
-# Initialize Terraform
 terraform init
-
-# Plan infrastructure
 terraform plan
-
-# Deploy (takes 15-25 minutes)
 terraform apply
 ```
 
-### Step 2: Connect to Cluster
+</details>
 
-```powershell
+<details>
+<summary><b>🚀 Deploy EKS Cluster (Bash)</b></summary>
+
+### Using Bash Script (Linux/Mac)
+
+```bash
+# From repository root
+./scripts/start-cluster.sh
+
+# Wait 15-25 minutes for deployment...
+# Script handles terraform init, plan, apply, and post-deployment config
+```
+
+### Manual Terraform Commands
+
+```bash
+cd infra/environments/prod
+terraform init
+terraform plan
+terraform apply
+```
+
+</details>
+
+<details>
+<summary><b>🔗 Connect to Cluster</b></summary>
+
+<details>
+<summary><b>� Connect to Cluster</b></summary>
+
+```bash
 # Update kubeconfig
 aws eks update-kubeconfig --region ap-south-1 --name my-eks-cluster
 
 # Verify connection
 kubectl get nodes
+
+# Check all pods
+kubectl get pods -A
 ```
 
-### Step 3: Deploy Cluster Autoscaler
+</details>
 
-```powershell
-# Apply autoscaler manifest
-terraform output -raw cluster_autoscaler_manifest | kubectl apply -f -
+<details>
+<summary><b>📊 Verify Cluster Components</b></summary>
 
-# Verify autoscaler is running
+```bash
+# Check nodes
+kubectl get nodes -o wide
+
+# Check system pods
+kubectl get pods -n kube-system
+
+# Check ALB controller (if installed via terraform)
+kubectl -n kube-system get deployment aws-load-balancer-controller
+
+# Check cluster autoscaler
 kubectl get pods -n kube-system -l app=cluster-autoscaler
 ```
 
@@ -218,11 +265,22 @@ kubectl get pods -n kube-system -l app=cluster-autoscaler
 <details>
 <summary><b>🛑 Stop & Destroy (Save Costs)</b></summary>
 
-```powershell
-# Use the provided script
-..\..\..\scripts\stop-cluster.ps1
+### Using PowerShell Script
 
-# Or manually
+```powershell
+.\scripts\stop-cluster.ps1
+```
+
+### Using Bash Script
+
+```bash
+./scripts/stop-cluster.sh
+```
+
+### Manual Terraform Destroy
+
+```bash
+cd infra/environments/prod
 terraform destroy
 ```
 
@@ -477,7 +535,7 @@ cluster_endpoint_public_access_cidrs = [
 
 | Feature | Status | Priority |
 |---------|--------|----------|
-| AWS Load Balancer Controller | 📋 Planned | High |
+| AWS Load Balancer Controller | ✅ Complete | - |
 | Metrics Server | 📋 Planned | High |
 | ExternalDNS | 📋 Planned | Medium |
 | VPC Flow Logs | 📋 Planned | Medium |
@@ -497,7 +555,7 @@ cluster_endpoint_public_access_cidrs = [
 - ✅ Added EKS managed add-ons (coredns, kube-proxy, vpc-cni)
 - ✅ Added Cluster Autoscaler IRSA role
 - ✅ Added API endpoint CIDR restrictions variable
-- ✅ Added start/stop scripts for cost management
+- ✅ Added start/stop scripts for cost management (PowerShell & Bash)
 - ✅ Added comprehensive `docs/guides/eks.md` documentation
 - ✅ Added `docs/guides/backend.md` for learning
 - ✅ Removed kubectl binary from repository

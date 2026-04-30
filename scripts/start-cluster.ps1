@@ -2,10 +2,21 @@
 # Usage: .\scripts\start-cluster.ps1
 # Deploys complete EKS cluster with VPC, nodes, ALB controller, and monitoring
 
+param(
+    [string]$EnvironmentName = $(if ($env:EKS_ENVIRONMENT_NAME) { $env:EKS_ENVIRONMENT_NAME } else { "prod" })
+)
+
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$TerraformDir = (Resolve-Path (Join-Path $ScriptDir "..\infra\environments\prod")).Path
+$EnvironmentPath = Join-Path $ScriptDir "..\infra\environments\$EnvironmentName"
+if (-not (Test-Path $EnvironmentPath)) {
+    Write-Host "Environment folder not found: $EnvironmentPath" -ForegroundColor Red
+    Write-Host "Set -EnvironmentName or EKS_ENVIRONMENT_NAME to a valid environment directory under infra/environments." -ForegroundColor Yellow
+    exit 1
+}
+
+$TerraformDir = (Resolve-Path $EnvironmentPath).Path
 Set-Location $TerraformDir
 
 function Assert-LastExitCode {
@@ -204,12 +215,12 @@ if ($vpcId) {
         Import-TerraformResourceIfMissing -Address 'module.vpc.aws_internet_gateway.this[0]' -ResourceId $igwId -StepName 'VPC internet gateway'
     }
 
-    $privateSubnetCidrs = @("10.20.16.0/20", "10.20.32.0/20")
+    $privateSubnetCidrs = @("10.20.0.0/20", "10.20.16.0/20", "10.20.32.0/20")
     for ($index = 0; $index -lt $privateSubnetCidrs.Count; $index++) {
         $cidrBlock = $privateSubnetCidrs[$index]
         $subnetId = aws ec2 describe-subnets --region $awsRegion --filters Name=vpc-id,Values=$vpcId Name=cidr-block,Values=$cidrBlock --query 'Subnets[0].SubnetId' --output text 2>$null
         if ($subnetId -and $subnetId -ne "None") {
-            Import-TerraformResourceIfMissing -Address "module.vpc.aws_subnet.private[$([int]($index + 1))]" -ResourceId $subnetId -StepName "private subnet $cidrBlock"
+            Import-TerraformResourceIfMissing -Address "module.vpc.aws_subnet.private[$index]" -ResourceId $subnetId -StepName "private subnet $cidrBlock"
         }
     }
 

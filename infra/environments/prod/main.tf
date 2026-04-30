@@ -48,7 +48,7 @@ module "eks" {
   cluster_name                             = var.cluster_name
   cluster_version                          = var.kubernetes_version
   cluster_endpoint_public_access           = true
-  cluster_endpoint_public_access_cidrs    = var.cluster_endpoint_public_access_cidrs
+  cluster_endpoint_public_access_cidrs     = var.cluster_endpoint_public_access_cidrs
   enable_cluster_creator_admin_permissions = true
 
   vpc_id     = module.vpc.vpc_id
@@ -76,12 +76,12 @@ module "eks" {
 
   eks_managed_node_groups = {
     default = {
-      name          = "default"
+      name            = "default"
       use_name_prefix = false
-      min_size      = var.node_min_size
-      max_size      = var.node_max_size
-      desired_size  = var.node_desired_size
-      capacity_type = "ON_DEMAND"
+      min_size        = var.node_min_size
+      max_size        = var.node_max_size
+      desired_size    = var.node_desired_size
+      capacity_type   = "ON_DEMAND"
       labels = {
         role = "general"
       }

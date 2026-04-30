@@ -10,14 +10,14 @@ module "cluster_autoscaler_irsa" {
 
   oidc_providers = {
     main = {
-      provider_arn                = module.eks.oidc_provider_arn
+      provider_arn               = module.eks.oidc_provider_arn
       namespace_service_accounts = ["kube-system:cluster-autoscaler"]
     }
   }
 
   # Use the built-in Cluster Autoscaler policy
   attach_cluster_autoscaler_policy = true
-  cluster_autoscaler_cluster_names  = [var.cluster_name]
+  cluster_autoscaler_cluster_names = [var.cluster_name]
 
   tags = {
     Name        = "${var.cluster_name}-cluster-autoscaler"

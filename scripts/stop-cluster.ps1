@@ -2,9 +2,105 @@
 # Usage: .\scripts\stop-cluster.ps1
 # This script cleanly destroys all infrastructure including ALBs, services, and Terraform resources
 
+param(
+    [string]$EnvironmentName = $(if ($env:EKS_ENVIRONMENT_NAME) { $env:EKS_ENVIRONMENT_NAME } else { "prod" })
+)
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$TerraformDir = (Resolve-Path (Join-Path $ScriptDir "..\infra\environments\prod")).Path
+$EnvironmentPath = Join-Path $ScriptDir "..\infra\environments\$EnvironmentName"
+if (-not (Test-Path $EnvironmentPath)) {
+    Write-Host "Environment folder not found: $EnvironmentPath" -ForegroundColor Red
+    Write-Host "Set -EnvironmentName or EKS_ENVIRONMENT_NAME to a valid environment directory under infra/environments." -ForegroundColor Yellow
+    exit 1
+}
+
+$TerraformDir = (Resolve-Path $EnvironmentPath).Path
 Set-Location $TerraformDir
+
+function Get-TfVarValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $content = Get-Content terraform.tfvars -Raw
+    $pattern = '(?m)^\s*' + [regex]::Escape($Name) + '\s*=\s*"([^"]+)"'
+    if ($content -match $pattern) {
+        return $Matches[1]
+    }
+
+    return $null
+}
+
+function Test-LiveEksCluster {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Region,
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $null = aws eks describe-cluster --region $Region --name $Name 2>$null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Remove-LiveEksCluster {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Region,
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    if (-not (Test-LiveEksCluster -Region $Region -Name $Name)) {
+        Write-Host "  ✓ No live EKS cluster found" -ForegroundColor Gray
+        return $true
+    }
+
+    Write-Host "  Found live EKS cluster '$Name' in $Region; deleting it directly..." -ForegroundColor Yellow
+
+    $nodeGroupsJson = aws eks list-nodegroups --region $Region --cluster-name $Name --output json 2>$null | ConvertFrom-Json
+    foreach ($nodeGroup in @($nodeGroupsJson.nodegroups)) {
+        if ([string]::IsNullOrWhiteSpace($nodeGroup)) {
+            continue
+        }
+
+        Write-Host "    - Deleting node group: $nodeGroup" -ForegroundColor Yellow
+        aws eks delete-nodegroup --region $Region --cluster-name $Name --nodegroup-name $nodeGroup 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "    ✗ Failed to delete node group: $nodeGroup" -ForegroundColor Red
+            return $false
+        }
+
+        aws eks wait nodegroup-deleted --region $Region --cluster-name $Name --nodegroup-name $nodeGroup 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "    ✗ Timed out waiting for node group deletion: $nodeGroup" -ForegroundColor Red
+            return $false
+        }
+    }
+
+    Write-Host "  Deleting EKS cluster..." -ForegroundColor Yellow
+    aws eks delete-cluster --region $Region --name $Name 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  ✗ Failed to start cluster deletion" -ForegroundColor Red
+        return $false
+    }
+
+    aws eks wait cluster-deleted --region $Region --name $Name 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  ✗ Timed out waiting for cluster deletion" -ForegroundColor Red
+        return $false
+    }
+
+    Write-Host "  ✓ EKS cluster deleted" -ForegroundColor Green
+    return $true
+}
+
+$awsRegion = Get-TfVarValue -Name "aws_region"
+if (-not $awsRegion) { $awsRegion = "ap-south-1" }
+
+$clusterName = Get-TfVarValue -Name "cluster_name"
+if (-not $clusterName) { $clusterName = "eks-cluster" }
 
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "  EKS Cluster Destruction Script" -ForegroundColor Cyan
@@ -86,7 +182,17 @@ Write-Host "  ✓ Deployments deleted"
 # Delete all namespaces except system ones
 Write-Host ""
 Write-Host "Deleting custom namespaces..." -ForegroundColor Green
-$nsToDelete = kubectl get ns -o json 2>$null | ConvertFrom-Json | Where-Object { $_.metadata.name -notmatch "kube-|default" } | Select-Object -ExpandProperty metadata.name
+$systemNamespaces = @(
+    "default",
+    "kube-system",
+    "kube-public",
+    "kube-node-lease"
+)
+$nsToDelete = kubectl get ns -o json 2>$null |
+    ConvertFrom-Json |
+    ForEach-Object { $_.items } |
+    Where-Object { $systemNamespaces -notcontains $_.metadata.name } |
+    ForEach-Object { $_.metadata.name }
 if ($nsToDelete) {
     foreach ($ns in $nsToDelete) {
         Write-Host "  - Deleting namespace: $ns" -ForegroundColor Yellow
@@ -101,6 +207,14 @@ Write-Host "  Phase 2: Destroying Infrastructure (Terraform)" -ForegroundColor C
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
 
+Write-Host "Initializing Terraform for destroy..." -ForegroundColor Green
+terraform init -input=false
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "❌ Terraform init failed - destroy cannot continue" -ForegroundColor Red
+    exit $LASTEXITCODE
+}
+
 $destroyOutput = terraform destroy --auto-approve 2>&1
 
 # Check if destroy succeeded
@@ -108,6 +222,18 @@ $destroySuccess = $LASTEXITCODE -eq 0
 
 Write-Host ""
 if ($destroySuccess) {
+    Write-Host ""
+    if (Test-LiveEksCluster -Region $awsRegion -Name $clusterName) {
+        $clusterDeleted = Remove-LiveEksCluster -Region $awsRegion -Name $clusterName
+        if (-not $clusterDeleted) {
+            Write-Host ""
+            Write-Host "❌ EKS cluster still exists - state files preserved" -ForegroundColor Red
+            exit 1
+        }
+    } else {
+        Write-Host "  ✓ EKS cluster already absent" -ForegroundColor Gray
+    }
+
     Write-Host "✅ Terraform destroy completed successfully" -ForegroundColor Green
 } else {
     Write-Host "⚠️  Terraform destroy had errors - checking what failed..." -ForegroundColor Yellow
