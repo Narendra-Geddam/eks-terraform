@@ -67,6 +67,27 @@ else
     echo "(loaded)"
 fi
 
+# Simple bootstrap detection: set whether to enable Kubernetes-managed resources
+# Parse aws_region and cluster_name from terraform.tfvars if present
+AWS_REGION=$(grep -E '^\s*aws_region\s*=' terraform.tfvars | head -1 | sed 's/.*"\([^"]*\)".*/\1/' || true)
+CLUSTER_NAME=$(grep -E '^\s*cluster_name\s*=' terraform.tfvars | head -1 | sed 's/.*"\([^"]*\)".*/\1/' || true)
+
+CLUSTER_EXISTS=false
+if [ -n "$AWS_REGION" ] && [ -n "$CLUSTER_NAME" ]; then
+    if aws eks describe-cluster --region "$AWS_REGION" --name "$CLUSTER_NAME" &>/dev/null; then
+        CLUSTER_EXISTS=true
+    fi
+fi
+
+# If a cluster already exists, skip Kubernetes resources during the initial Terraform run
+if [ "$CLUSTER_EXISTS" = true ]; then
+    export TF_VAR_enable_kubernetes_resources=false
+    echo "  Kubernetes resources will be SKIPPED (existing cluster detected)"
+else
+    export TF_VAR_enable_kubernetes_resources=true
+    echo "  Kubernetes resources will be DEPLOYED (no existing cluster)"
+fi
+
 echo ""
 echo "=========================================="
 echo "  Phase 2: Terraform Initialization"

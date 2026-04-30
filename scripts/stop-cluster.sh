@@ -31,6 +31,12 @@ if [ "$confirm" != "yes" ]; then
     exit 0
 fi
 
+# Check for jq; if missing we'll fall back to simpler parsing later
+HAS_JQ=false
+if command -v jq &>/dev/null; then
+    HAS_JQ=true
+fi
+
 echo ""
 echo "=========================================="
 echo "  Phase 1: Cleaning Kubernetes Resources"
@@ -60,7 +66,11 @@ echo "  ✓ Ingress resources deleted"
 # Delete all LoadBalancer services (triggers ALB deletion)
 echo ""
 echo "🗑️  Deleting LoadBalancer services..."
-LOAD_BALANCERS=$(kubectl get svc -A -o json 2>/dev/null | jq -r '.items[] | select(.spec.type=="LoadBalancer") | .metadata.name' | wc -l)
+if [ "$HAS_JQ" = true ]; then
+    LOAD_BALANCERS=$(kubectl get svc -A -o json 2>/dev/null | jq -r '.items[] | select(.spec.type=="LoadBalancer") | .metadata.name' | wc -l)
+else
+    LOAD_BALANCERS=$(kubectl get svc -A 2>/dev/null | grep -c "LoadBalancer" || echo "0")
+fi
 
 if [ "$LOAD_BALANCERS" -gt 0 ]; then
     echo "  ⚠️  Found $LOAD_BALANCERS LoadBalancer(s), deleting..."
@@ -82,12 +92,18 @@ echo "  ✓ Deployments deleted"
 # Delete custom namespaces
 echo ""
 echo "🗑️  Deleting custom namespaces..."
-CUSTOM_NS=$(kubectl get ns -o json 2>/dev/null | jq -r '.items[] | select(.metadata.name | test("^kube-|^default") | not) | .metadata.name')
+if [ "$HAS_JQ" = true ]; then
+    CUSTOM_NS=$(kubectl get ns -o json 2>/dev/null | jq -r '.items[] | select(.metadata.name | test("^kube-|^default") | not) | .metadata.name')
+else
+    CUSTOM_NS=$(kubectl get ns 2>/dev/null | tail -n +2 | grep -v "^kube-" | grep -v "^default" | awk '{print $1}')
+fi
 
 if [ -n "$CUSTOM_NS" ]; then
     while IFS= read -r ns; do
-        echo "  - Deleting namespace: $ns"
-        kubectl delete ns "$ns" --ignore-not-found=true 2>/dev/null || true
+        if [ -n "$ns" ]; then
+            echo "  - Deleting namespace: $ns"
+            kubectl delete ns "$ns" --ignore-not-found=true 2>/dev/null || true
+        fi
     done <<< "$CUSTOM_NS"
 fi
 echo "  ✓ Custom namespaces deleted"
@@ -98,6 +114,10 @@ echo "  Phase 2: Destroying Infrastructure (Terraform)"
 echo "=========================================="
 echo ""
 
+echo "Initializing Terraform (safe) before destroy..."
+terraform init -input=false || true
+
+echo "Destroying Terraform-managed resources..."
 terraform destroy --auto-approve
 
 echo ""
